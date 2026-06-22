@@ -1,0 +1,11 @@
+(* Source files for sml-trace, in dependency order. Pulls in the vendored
+   sml-prng (SplitMix64 used for TraceId/SpanId generation) and sml-json
+   (Json structure used by OtlpExport). *)
+
+$(SML_LIB)/basis/basis.mlb
+
+../sml-prng/prng.mlb
+../sml-json/src/json.mlb
+
+trace.sig
+trace.sml

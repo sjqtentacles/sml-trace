@@ -1,0 +1,6 @@
+package github.com/sjqtentacles/sml-trace
+
+require {
+  github.com/sjqtentacles/sml-prng
+  github.com/sjqtentacles/sml-json
+}

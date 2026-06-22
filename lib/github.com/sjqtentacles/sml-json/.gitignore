@@ -1,0 +1,7 @@
+# build artifacts
+/bin/test-mlton
+/bin/test-poly
+/bin/jsonfmt
+
+# editor/OS noise
+.DS_Store

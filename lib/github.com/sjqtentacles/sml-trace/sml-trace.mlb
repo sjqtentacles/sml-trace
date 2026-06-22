@@ -1,0 +1,7 @@
+(* sml-trace: public library basis. Re-exports the vendored sml-prng and
+   sml-json plus the trace sources, so a consumer gets the Trace
+   structures. *)
+
+$(SML_LIB)/basis/basis.mlb
+
+sources.mlb

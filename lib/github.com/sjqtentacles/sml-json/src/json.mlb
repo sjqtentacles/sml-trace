@@ -1,0 +1,10 @@
+(* MLB for the sml-json library: the vendored sml-parsec core plus the JSON
+ * sources (parser + serializer). Consumers reference this file.
+ *
+ * Note: parsec.mlb is brought in WITHOUT a `local` wrapper so that consumers
+ * (e.g. the test suite, the CLI) can `open CharParsec` alongside `Json`. *)
+$(SML_LIB)/basis/basis.mlb
+../lib/github.com/sjqtentacles/sml-parsec/parsec.mlb
+json.sig
+json.sml
+jsonPretty.sml

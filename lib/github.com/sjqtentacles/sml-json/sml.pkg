@@ -1,0 +1,5 @@
+package github.com/sjqtentacles/sml-json
+
+require {
+  github.com/sjqtentacles/sml-parsec
+}
