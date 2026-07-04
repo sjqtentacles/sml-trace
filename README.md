@@ -21,7 +21,9 @@ itself vendors `sml-parsec`) for OTLP/JSON export.
   any case.
 - **Span**: `{traceId, spanId, parentSpanId, name, kind, attributes,
   events, status, startTime, endTime option}`. `start`, `finish`,
-  `addAttr`, `addEvent`, `setStatus`.
+  `addAttr`, `addEvent`, `setStatus`. Timestamps (`startTime`, `endTime`,
+  event `time`) and the tracer clock are `IntInf.int`, so a real Unix
+  *nanosecond* count (~1.7e18) is stored and exported losslessly.
 - **Tracer**: pure accumulator. `startSpan` pushes a span (inheriting the
   current traceId/parent when the stack is non-empty, starting a fresh
   trace otherwise); `endSpan` pops and records it.
@@ -51,6 +53,12 @@ is the caller's job.
 
 Pure Standard ML. Verified on **MLton** and **Poly/ML**, with identical,
 deterministic output across both.
+
+Both compilers use a fixed-width default `int` (MLton 32-bit, Poly/ML
+63-bit) -- neither is arbitrary precision. Timestamps and integer JSON
+numbers therefore use `IntInf.int` (arbitrary precision on both), so a
+Unix nanosecond timestamp serializes to the same exact digits on each and
+never overflows MLton's 32-bit `int`.
 
 ## Usage
 
@@ -106,6 +114,10 @@ make clean
 - OTLP JSON: one `resourceSpans` entry with a `service.name` resource and
   a single scope; two spans; the root has `name = "root"`; the child has
   `parentSpanId`.
+- Large integers: a realistic Unix nanosecond timestamp (~1.7e18, past
+  MLton's 2^31 `int` ceiling) used as `startTime`/`endTime`, plus a large
+  integer attribute, serialize to their exact decimal digits with no
+  overflow or truncation on either compiler.
 - Determinism: same seed -> same `TraceId` / `SpanId` sequence; same-seed
   `Tracer` produces the same spanId sequence.
 

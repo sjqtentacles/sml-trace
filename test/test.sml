@@ -233,6 +233,53 @@ struct
                    SOME (JStr _) => true | _ => false)
           | NONE => false)
 
+      val () = section "large integers serialize losslessly (no overflow)"
+
+      (* A realistic Unix *nanosecond* timestamp (~1.72e18). It exceeds 2^31
+         (MLton's default fixed-width `int` max, ~2.1e9) AND is representable
+         only because timestamps are carried as arbitrary-precision `IntInf`;
+         a fixed-width `int` would overflow under MLton before we ever reach
+         JSON. We build a span with this start/end time, export to OTLP/JSON,
+         serialize, and assert the exact decimal digits survive round-unmodified. *)
+      val nanoStart : IntInf.int = 1719878400123456789
+      val nanoEnd   : IntInf.int = 1719878400987654321
+      val bigSpan =
+        Trace.finish
+          (Trace.addAttr
+             (Trace.start
+                { traceId = tid2, spanId = sid2, parentSpanId = NONE,
+                  name = "nano", kind = Trace.Server, startTime = nanoStart },
+              (* An integer attribute at MLton's 32-bit int ceiling (2^31-1):
+                 the largest value a machine `int` can hold on both compilers,
+                 so it converts to IntInf and prints without truncation. *)
+              "http.request_size", Trace.AInt 2147483647),
+           nanoEnd)
+      val bigJson = Trace.OtlpExport.toJson [bigSpan]
+      (* Serialize with the vendored minifier and look for the exact digits. *)
+      val bigStr = JsonPretty.toString bigJson
+      fun contains (hay, needle) =
+        let val n = String.size needle and h = String.size hay
+            fun at i = i + n <= h andalso String.substring (hay, i, n) = needle
+            fun go i = i + n <= h andalso (at i orelse go (i + 1))
+        in go 0 end
+      val () = checkBool "nanosecond startTime serializes to exact digits" (true,
+        contains (bigStr, "1719878400123456789"))
+      val () = checkBool "nanosecond endTime serializes to exact digits" (true,
+        contains (bigStr, "1719878400987654321"))
+      val () = checkBool "large int attribute serializes to exact digits" (true,
+        contains (bigStr, "2147483647"))
+      (* The exported startTimeUnixNano JInt carries the exact IntInf value. *)
+      val () = checkBool "startTimeUnixNano JInt is exact" (true,
+        case lookup "startTimeUnixNano"
+               (case lookup "spans"
+                      (case lookup "scopeSpans"
+                             (case lookup "resourceSpans" bigJson of
+                                  SOME (JArr [rs]) => rs | _ => JNull) of
+                          SOME (JArr [ss]) => ss | _ => JNull) of
+                    SOME (JArr [sp]) => sp | _ => JNull) of
+            SOME (JInt n) => n = nanoStart
+          | _ => false)
+
       val () = section "deterministic seeded sequence"
 
       (* Same seed -> same TraceId sequence. *)

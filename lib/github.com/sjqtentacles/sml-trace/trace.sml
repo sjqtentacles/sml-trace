@@ -143,7 +143,11 @@ struct
     | ABool of bool
     | AReal of real
 
-  type spanEvent = { name : string, time : int, attributes : (string * attrValue) list }
+  (* Timestamps are `IntInf.int` (arbitrary precision) so a real Unix
+     nanosecond count (~1.7e18) is exact and identical on MLton and Poly/ML,
+     both of which use a fixed-width default `int` (MLton 32-bit, Poly/ML
+     63-bit) that a nanosecond value would overflow. See trace.sig. *)
+  type spanEvent = { name : string, time : IntInf.int, attributes : (string * attrValue) list }
 
   datatype spanStatus = Ok | Error of string | Unset
 
@@ -156,8 +160,8 @@ struct
     , attributes    : (string * attrValue) list
     , events        : spanEvent list
     , status        : spanStatus
-    , startTime     : int
-    , endTime       : int option
+    , startTime     : IntInf.int
+    , endTime       : IntInf.int option
     }
 
   fun setAttrs (s : span) v : span =
@@ -186,7 +190,7 @@ struct
       name = name, kind = kind, attributes = [], events = [],
       status = Unset, startTime = startTime, endTime = NONE }
 
-  fun finish (s : span, endTime : int) : span =
+  fun finish (s : span, endTime : IntInf.int) : span =
     let
       val st =
         case #status s of
@@ -207,7 +211,7 @@ struct
   (* ============ Tracer ============ *)
 
   type tracer =
-    { clock : int
+    { clock : IntInf.int
     , spans : span list
     , current : span list
     , seed : W.word
@@ -267,7 +271,7 @@ struct
     let
       val all = #spans t
       fun cmp (a, b) =
-        case Int.compare (#startTime a, #startTime b) of
+        case IntInf.compare (#startTime a, #startTime b) of
             EQUAL => String.compare (SpanId.toHex (#spanId a),
                                      SpanId.toHex (#spanId b))
           | o' => o'
@@ -353,7 +357,9 @@ struct
     fun attrValueToJson v =
       case v of
           AStr s => JObj [("stringValue", JStr s)]
-        | AInt i => JObj [("intValue", JInt i)]
+          (* AInt carries a machine `int`; widen losslessly to the JSON
+             IntInf payload (no truncation of the value the int already holds). *)
+        | AInt i => JObj [("intValue", JInt (IntInf.fromInt i))]
         | ABool b => JObj [("boolValue", JBool b)]
         | AReal r => JObj [("doubleValue", JReal r)]
 
@@ -379,7 +385,7 @@ struct
           [("traceId", JStr (TraceId.toHex (#traceId s))),
            ("spanId", JStr (SpanId.toHex (#spanId s))),
            ("name", JStr (#name s)),
-           ("kind", JInt (kindToInt (#kind s))),
+           ("kind", JInt (IntInf.fromInt (kindToInt (#kind s)))),
            ("startTimeUnixNano", JInt (#startTime s))]
           @ endTime
           @ parent

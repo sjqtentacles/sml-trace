@@ -54,7 +54,16 @@ sig
     | ABool of bool
     | AReal of real
 
-  type spanEvent = { name : string, time : int, attributes : (string * attrValue) list }
+  (* Timestamps are `IntInf.int` (arbitrary precision) so a real Unix
+     *nanosecond* count (~1.7e18) is exact and identical on both MLton and
+     Poly/ML. Both compilers use a fixed-width default `int` (MLton 32-bit,
+     Poly/ML 63-bit) -- NOT arbitrary precision -- so a nanosecond timestamp
+     overflows MLton's `int` and is not representable in Poly/ML's `int`
+     either once it passes 2^62. `IntInf` (arbitrary on both) sidesteps this
+     and exports to `*UnixNano` JSON fields losslessly. Logical-clock ticks
+     from `startSpan`/`endSpan` are small; the wide type just lets callers
+     supply real nanosecond times without a latent overflow. *)
+  type spanEvent = { name : string, time : IntInf.int, attributes : (string * attrValue) list }
 
   datatype spanStatus = Ok | Error of string | Unset
 
@@ -67,16 +76,16 @@ sig
     , attributes    : (string * attrValue) list
     , events        : spanEvent list
     , status        : spanStatus
-    , startTime     : int          (* logical tick *)
-    , endTime       : int option   (* NONE until finished *)
+    , startTime     : IntInf.int          (* logical tick or Unix nanos *)
+    , endTime       : IntInf.int option   (* NONE until finished *)
     }
 
   (* `start` creates an unfinished span (endTime = NONE). *)
   val start : { traceId : TraceId.t, spanId : SpanId.t,
                 parentSpanId : SpanId.t option, name : string,
-                kind : spanKind, startTime : int } -> span
+                kind : spanKind, startTime : IntInf.int } -> span
   (* `finish s endTime` sets endTime and status (default Unset->Ok). *)
-  val finish   : span * int -> span
+  val finish   : span * IntInf.int -> span
   val addAttr  : span * string * attrValue -> span
   val addEvent : span * spanEvent -> span
   val setStatus: span * spanStatus -> span
@@ -84,7 +93,7 @@ sig
   (* ============ Tracer ============ *)
 
   type tracer =
-    { clock : int
+    { clock : IntInf.int          (* logical tick, advances by one per startSpan *)
     , spans : span list           (* finished spans, newest-first *)
     , current : span list         (* active stack, head = innermost *)
     , seed : Word64.word
