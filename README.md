@@ -96,6 +96,106 @@ make all-tests   # run under both
 make clean
 ```
 
+## Example
+
+`make example` builds and runs [`examples/demo.sml`](examples/demo.sml), which
+generates trace/span ids from a fixed seed, round-trips a W3C traceparent
+header, builds a two-span trace with attributes and events, and exports it
+as OTLP/JSON (output is byte-identical under MLton and Poly/ML):
+
+```
+=== sml-trace demo ===
+
+-- deterministic id generation from a seed --
+  traceId = 1c948e1575796814ae9ef1ab67004bdb
+  rootId  = 1464cc6881c5ee9f
+  childId = d513e40e7e6987ac
+
+-- W3C traceparent codec --
+  traceparent = 00-1c948e1575796814ae9ef1ab67004bdb-1464cc6881c5ee9f-01
+  decode roundtrips = true
+
+-- building a two-span trace: start, addAttr, addEvent, finish --
+  handle-request  span=1464cc6881c5ee9f  parent=-  [0..5]  attrs=2  events=1
+  db-query  span=d513e40e7e6987ac  parent=1464cc6881c5ee9f  [1..4]  attrs=1  events=0
+
+-- OTLP/JSON export --
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "sml-trace"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "sml-trace",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "1c948e1575796814ae9ef1ab67004bdb",
+              "spanId": "1464cc6881c5ee9f",
+              "name": "handle-request",
+              "kind": 2,
+              "startTimeUnixNano": 0,
+              "endTimeUnixNano": 5,
+              "attributes": {
+                "http.status_code": {
+                  "intValue": 200
+                },
+                "http.method": {
+                  "stringValue": "GET"
+                }
+              },
+              "events": [
+                {
+                  "name": "dispatch",
+                  "timeUnixNano": 1,
+                  "attributes": {
+                    "queue.size": {
+                      "intValue": 3
+                    }
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              }
+            },
+            {
+              "traceId": "1c948e1575796814ae9ef1ab67004bdb",
+              "spanId": "d513e40e7e6987ac",
+              "name": "db-query",
+              "kind": 3,
+              "startTimeUnixNano": 1,
+              "endTimeUnixNano": 4,
+              "parentSpanId": "1464cc6881c5ee9f",
+              "attributes": {
+                "db.statement": {
+                  "stringValue": "SELECT 1"
+                }
+              },
+              "events": [],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## Test coverage
 
 - TraceId: hex round-trip (generated and known vectors); 32-char lowercase
